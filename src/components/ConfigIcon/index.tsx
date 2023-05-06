@@ -6,7 +6,7 @@ interface ConfigIconProps {
 }
 const ConfigIcon: FC<ConfigIconProps & React.HTMLAttributes<HTMLElement>> = ({
   name,
-  size = 18,
+  size = 20,
   ...rest
 }) => (
   <i
