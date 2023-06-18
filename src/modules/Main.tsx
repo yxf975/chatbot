@@ -1,4 +1,11 @@
-import { FC, useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import {
+  FC,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from 'react';
 import GlobalContext from '@contexts/global';
 import {
   defaultConversation,
@@ -9,8 +16,9 @@ import {
 import type { Conversation, GlobalConfig, Lang } from '@interfaces';
 import { getI18n } from '@utils/i18n';
 import { debounce } from 'lodash-es';
-import { isMatchMobile } from '@utils';
+import { registerMediumZoom, isMatchMobile, setClassByLayout } from '@utils';
 import { ConfigProvider } from 'antd';
+import { writeHistory } from '@utils/history';
 import Sidebar from './Sidebar';
 import Content from './Content';
 import Empty from './Empty';
@@ -18,7 +26,7 @@ import Configuration from './Configuration';
 
 const styles = getComputedStyle(document.documentElement);
 
-const Main: FC<{ lang: Lang }> = ({ lang }) => {
+const Main: FC<{ lang: Lang; inVercel: boolean }> = ({ lang, inVercel }) => {
   // gloabl configs
   const [configs, setConfigs] = useState<Partial<GlobalConfig>>({});
 
@@ -29,10 +37,7 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
   const [conversations, setConversations] = useState<
     Record<string, Conversation>
   >({
-    [defaultConversation.id]: {
-      ...defaultConversation,
-      title: i18n.status_empty,
-    },
+    [defaultConversation.id]: defaultConversation,
   });
 
   const [activeSetting, setActiveSetting] = useState(false);
@@ -40,17 +45,23 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
   // media query
   const [isMobile, setIsMobile] = useState(isMatchMobile());
 
-  const list = Object.values(conversations)
-    .reverse()
-    .map((conversation) => ({
-      key: conversation.id,
-      mode: conversation.mode,
-      title: conversation.title,
-      message: conversation.messages.slice(-1)?.[0]?.content ?? '',
-      time:
-        conversation.messages.slice(-1)?.[0]?.createdAt ??
-        conversation.createdAt,
-    }));
+  // mobile history ref
+  const historyRef = useRef({
+    activeSetting,
+    isMobile,
+    currentId,
+  });
+
+  const list = Object.values(conversations).map((conversation) => ({
+    key: conversation.id,
+    mode: conversation.mode,
+    title: conversation.title,
+    message: conversation.messages.slice(-1)?.[0]?.content ?? '',
+    time:
+      conversation.messages.slice(-1)?.[0]?.createdAt ??
+      conversation.updatedAt ??
+      conversation.createdAt,
+  }));
 
   // debounce resize
   const handleDebounceResize = debounce(() => {
@@ -61,11 +72,16 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
     window.addEventListener('resize', handleDebounceResize);
   }, []);
 
+  useEffect(() => {
+    registerMediumZoom(isMobile);
+  }, [currentId, conversations, isMobile]);
+
   const setConversationsFromLocal = useCallback(() => {
     try {
       const localConversation = localStorage.getItem(localConversationKey);
       if (localConversation) {
-        const conversation = JSON.parse(localConversation);
+        const conversation: Record<string, Conversation> =
+          JSON.parse(localConversation);
         // historical localstorage
         if (Array.isArray(conversation) && conversation.length > 0) {
           setConversations({
@@ -78,9 +94,18 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
           });
         } else {
           setConversations(conversation);
-          setCurrentId(
-            Object.keys(conversation)?.reverse()?.[0] ?? defaultConversation.id
-          );
+          if (isMobile) {
+            setCurrentId('');
+          } else {
+            setCurrentId(
+              Object.keys(conversation)?.sort((a, b) =>
+                (conversation?.[b]?.updatedAt ?? conversation?.[b]?.createdAt) >
+                (conversation?.[a]?.updatedAt ?? conversation?.[a]?.createdAt)
+                  ? 1
+                  : -1
+              )?.[0] ?? defaultConversation.id
+            );
+          }
         }
       }
     } catch (e) {
@@ -97,7 +122,7 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
     const localConfigsStr = localStorage.getItem(globalConfigLocalKey);
     if (localConfigsStr) {
       try {
-        const localConfigs = JSON.parse(localConfigsStr);
+        const localConfigs: GlobalConfig = JSON.parse(localConfigsStr);
         setConfigs((currentConfigs) => ({
           ...defaultConfigs,
           ...currentConfigs,
@@ -105,6 +130,9 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
         }));
         if (localConfigs.save) {
           setConversationsFromLocal();
+        }
+        if (localConfigs.layout) {
+          setClassByLayout(localConfigs.layout);
         }
       } catch (e) {
         setConfigs(defaultConfigs);
@@ -125,6 +153,42 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
       localStorage.removeItem(localConversationKey);
     }
   }, [conversations, configs.save]);
+
+  useEffect(() => {
+    historyRef.current = {
+      currentId,
+      activeSetting,
+      isMobile,
+    };
+  }, [currentId, activeSetting, isMobile]);
+
+  useEffect(() => {
+    if (isMobile && currentId) {
+      writeHistory();
+    }
+  }, [isMobile, currentId]);
+
+  // handle mobile go back
+  useEffect(() => {
+    const handleHistoryBack = () => {
+      if (historyRef.current.isMobile) {
+        if (historyRef.current.currentId) {
+          if (historyRef.current.activeSetting) {
+            setActiveSetting(false);
+          } else {
+            setCurrentId(undefined);
+          }
+        } else {
+          window.history.go(-1);
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handleHistoryBack);
+    return () => {
+      window.removeEventListener('popstate', handleHistoryBack);
+    };
+  }, []);
 
   const getSidebar = () => <Sidebar data={list} />;
 
@@ -149,6 +213,7 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
         setCurrentId,
         conversations,
         setConversations,
+        inVercel,
       }}
     >
       <ConfigProvider
@@ -180,10 +245,14 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
             </>
           ) : (
             <>
-              <div className={activeSetting ? 'w-1/4' : 'w-1/3'}>
+              <div
+                className={`${activeSetting ? 'w-1/4' : 'w-1/3'} max-w-[400px]`}
+              >
                 {getSidebar()}
               </div>
-              <div className={`${activeSetting ? 'w-3/4' : 'w-2/3'} flex`}>
+              <div
+                className={`${activeSetting ? 'w-3/4' : 'w-2/3'} flex flex-1`}
+              >
                 <div
                   className={`h-full ${
                     activeSetting ? 'w-2/3' : 'w-full'
@@ -192,7 +261,7 @@ const Main: FC<{ lang: Lang }> = ({ lang }) => {
                   {currentId ? getContent() : getEmpty()}
                 </div>
                 {activeSetting ? (
-                  <div className="w-1/3">{getConfigration()}</div>
+                  <div className="w-1/3 max-w-[400px]">{getConfigration()}</div>
                 ) : null}
               </div>
             </>

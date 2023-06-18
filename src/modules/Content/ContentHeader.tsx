@@ -43,7 +43,9 @@ const ContentHeader: FC<ContentHeaderProps> = ({
           />
         ) : null}
         <div className="text-[#232629] flex-1 flex overflow-hidden">
-          <div className="truncate">{conversation.title}</div>
+          <div className="truncate">
+            {conversation.title || i18n.status_empty}
+          </div>
           <div className="ml-1">
             <ConfigIcon
               name="ri-edit-2-line"
@@ -64,15 +66,17 @@ const ContentHeader: FC<ContentHeaderProps> = ({
             }}
           />
         </Tooltip>
-        <Tooltip title={i18n.action_prompt}>
-          <ConfigIcon
-            name="ri-user-add-line mr-2"
-            onClick={() => {
-              setText('/');
-              setShowPrompt(true);
-            }}
-          />
-        </Tooltip>
+        {conversation.mode === 'image' ? null : (
+          <Tooltip title={i18n.action_prompt}>
+            <ConfigIcon
+              name="ri-user-add-line mr-2"
+              onClick={() => {
+                setText('/');
+                setShowPrompt(true);
+              }}
+            />
+          </Tooltip>
+        )}
         <ConfigIcon
           name="ri-settings-3-line"
           onClick={() => setActiveSetting((active) => !active)}

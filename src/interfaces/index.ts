@@ -1,12 +1,23 @@
+import type { MessageItem } from 'midjourney-fetch';
 import {
+  LayoutConfig,
   SupportedImageModels,
   SupportedImgSize,
   SupportedModel,
 } from '@configs';
 
+export type MidjourneyMessage = Pick<
+  MessageItem,
+  'id' | 'components' | 'attachments'
+> & {
+  prompt: string;
+};
+
 export interface Message {
   content: string;
   role: 'assistant' | 'user';
+  imageModel?: SupportedImageModels; // distinguish avator
+  midjourneyMessage?: MidjourneyMessage;
   createdAt?: number;
   expiredAt?: number; // for image mode
 }
@@ -38,6 +49,10 @@ export interface GlobalConfig {
   imagesCount: number;
   imageSize: SupportedImgSize;
   lang: Lang;
+  discordServerId: string;
+  discordChannelId: string;
+  discordToken: string;
+  layout: LayoutConfig;
 }
 
 export interface Prompt {

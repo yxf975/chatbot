@@ -6,18 +6,24 @@ export const localConversationKey = 'LOCAL_CONVERSATION';
 // From https://platform.openai.com/docs/models/model-endpoint-compatibility
 export const supportedModels = [
   'gpt-4',
-  'gpt-4-0314',
+  'gpt-4-0613',
   'gpt-4-32k',
-  'gpt-4-32k-0314',
+  'gpt-4-32k-0613',
   'gpt-3.5-turbo',
-  'gpt-3.5-turbo-0301',
+  'gpt-3.5-turbo-0613',
+  'gpt-3.5-turbo-16k',
+  'gpt-3.5-turbo-16k-0613',
 ] as const;
 
 export type SupportedModel = (typeof supportedModels)[number];
 
 export const defaultModel: SupportedModel = 'gpt-3.5-turbo';
 
-export const supportedImageModels = ['DALL-E', 'Midjourney'] as const;
+export const supportedImageModels = [
+  'DALL-E',
+  'Midjourney',
+  'Replicate',
+] as const;
 
 export type SupportedImageModels = (typeof supportedImageModels)[number];
 
@@ -39,6 +45,12 @@ export const supportedLanguages = [
   },
 ];
 
+export const layoutConfig = ['full', 'loose', 'default'] as const;
+
+export type LayoutConfig = (typeof layoutConfig)[number];
+
+export const defaultLayoutConfig: LayoutConfig = 'default';
+
 export const defaultGloablConfig: GlobalConfig = {
   password: '',
   openAIApiKey: '',
@@ -51,11 +63,21 @@ export const defaultGloablConfig: GlobalConfig = {
   imagesCount: 1,
   imageSize: '256x256',
   lang: 'en',
+  discordChannelId: '',
+  discordServerId: '',
+  discordToken: '',
+  layout: defaultLayoutConfig,
 };
 
-export const defaultConversation: Omit<Conversation, 'title'> = {
+export const defaultConversation: Conversation = {
   id: '1',
+  title: '',
   messages: [],
   mode: 'text',
   createdAt: Date.now(),
+};
+
+export const midjourneyConfigs = {
+  timeout: 5 * 60 * 1000, // 5min
+  interval: 20 * 1000, // every 20 second
 };
