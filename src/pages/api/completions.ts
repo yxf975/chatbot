@@ -52,7 +52,7 @@ export const post: APIRoute = async ({ request }) => {
   }
 
   try {
-    const res = await fetch(`https://${baseURL}/v1/completions`, {
+    const res = await fetch(`https://${baseURL}/v1/chat/completions`, {
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${key}`,
